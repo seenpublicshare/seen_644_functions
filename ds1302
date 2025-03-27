@@ -1,0 +1,178 @@
+#pragma once
+#include <Arduino.h>
+#include <ThreeWire.h>
+#include <RtcDS1302.h>
+
+void WriteRTC(byte a);
+void InitRTC();
+void SetSysTime(byte *ptrTime);
+void SetRam();
+void GetRam();
+void GetSysTime(uint8_t *ptrTime);
+
+ThreeWire seen12Board(21, 22, 23); // IO, SCLK, CE
+RtcDS1302<ThreeWire> Rtc(seen12Board);
+
+void setup_rtc()
+{
+    Rtc.Begin();
+
+    RtcDateTime compiled = RtcDateTime(__DATE__, __TIME__);
+
+    if (!Rtc.IsDateTimeValid() || Rtc.GetDateTime().Year() < 2001)
+    {
+        // Serial.println("RTC lost confidence in the DateTime!");
+        Rtc.SetDateTime(compiled);
+    }
+
+    if (Rtc.GetIsWriteProtected())
+    {
+        // Serial.println("RTC was write protected, enabling writing now");
+        Rtc.SetIsWriteProtected(false);
+    }
+
+    if (!Rtc.GetIsRunning())
+    {
+        // Serial.println("RTC was not actively running, starting now");
+        Rtc.SetIsRunning(true);
+    }
+}
+
+void GetSysTime(uint8_t *ptrTime)
+{
+    RtcDateTime now = Rtc.GetDateTime();
+    ptrTime[0] = now.Second();     // seconds
+    ptrTime[1] = now.Minute();     // minutes
+    ptrTime[2] = now.Hour();       // hours
+    ptrTime[3] = now.Day();        // days
+    ptrTime[4] = now.Month();      // months
+    ptrTime[5] = now.Year() % 100; // years
+}
+
+void SetSysTime(uint8_t *ptrTime)
+{
+    Rtc.SetDateTime(RtcDateTime(ptrTime[5] + 2000, ptrTime[4], ptrTime[3], ptrTime[2], ptrTime[1], ptrTime[0]));
+}
+
+uint32_t convertRtcDateTimeToUnixtime()
+{
+    RtcDateTime dt = Rtc.GetDateTime();
+
+    // Mảng số ngày trong mỗi tháng (không tính năm nhuận)
+    const uint8_t daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+    uint32_t unixtime;
+    uint16_t year = dt.Year();
+    uint8_t month = dt.Month();
+    uint8_t day = dt.Day();
+    uint8_t hour = dt.Hour();
+    uint8_t minute = dt.Minute();
+    uint8_t second = dt.Second();
+
+    // Số ngày từ 1/1/1970 đến năm hiện tại
+    // 365 ngày/năm * (năm hiện tại - 1970) + số năm nhuận từ 1970 đến năm trước năm hiện tại
+    uint32_t days = (year - 1970) * 365 + ((year - 1) / 4 - 1970 / 4);
+
+    // Trừ đi năm nhuận từ 1970 đến 2099 không phải là năm nhuận
+    if (year > 2100)
+        days -= 1;
+
+    // Cộng thêm số ngày từ đầu năm hiện tại đến ngày hiện tại
+    for (uint8_t i = 1; i < month; i++)
+        days += daysInMonth[i];
+
+    // Thêm 1 ngày nếu năm hiện tại là năm nhuận và tháng > 2
+    if ((year % 4 == 0) && (year != 2100) && (month > 2))
+        days += 1;
+
+    // Cộng thêm ngày trong tháng hiện tại
+    days += day - 1;
+
+    // Chuyển đổi thành giây
+    unixtime = days * 86400;
+    unixtime += hour * 3600;
+    unixtime += minute * 60;
+    unixtime += second;
+
+    return unixtime;
+}
+
+bool isDs1302OutOfBattery()
+{
+    uint8_t csCalc = RTC_CHECKSUM_INITIAL_VALUE;
+    uint8_t csDs = 0;
+
+    uint8_t buff[DS1302RamSize];
+    Rtc.GetMemory(&buff[0], DS1302RamSize);
+
+    if (memcmp(buff, &EEPROM_UIDs[0], MAX_UID_CHECK_SIZE) != 0)
+        return true;
+
+    // Calc checksum
+    for (int i = 0; i < DS1302RamSize - 1; i++)
+    {
+        csCalc += buff[i];
+    }
+
+    // Stored checksum
+    csDs = buff[DS1302RamSize - 1]; // byte 31
+
+    return csDs != csCalc;
+}
+
+void SetRam()
+{
+    byte Checksum = RTC_CHECKSUM_INITIAL_VALUE;
+
+    byte buffer[DS1302RamSize];
+    memset(buffer, 0, DS1302RamSize);
+
+    uint8_t pos = 0;
+
+    memcpy(&buffer[pos], &EEPROM_UIDs, MAX_UID_CHECK_SIZE);
+    pos += MAX_UID_CHECK_SIZE;
+
+    memcpy(&buffer[pos], &LastMoney, sizeof(LastMoney));
+    pos += sizeof(LastMoney);
+    memcpy(&buffer[pos], &LastLiter, sizeof(LastLiter));
+    pos += sizeof(LastLiter);
+
+    memcpy(&buffer[pos], &XMode, sizeof(XMode));
+    pos += sizeof(XMode);
+    memcpy(&buffer[pos], &AddPulsePercent, sizeof(AddPulsePercent));
+    pos += sizeof(AddPulsePercent);
+
+    memcpy(&buffer[pos], &Meter24VFactor, sizeof(Meter24VFactor));
+    pos += sizeof(Meter24VFactor);
+
+    for (uint8_t i = 0; i < DS1302RamSize - 1; i++)
+    {
+        Checksum += buffer[i];
+    }
+    memcpy(&buffer[DS1302RamSize - 1], &Checksum, sizeof(Checksum));
+
+    Rtc.SetMemory(buffer, DS1302RamSize);
+}
+void GetRam()
+{
+    byte buffer[DS1302RamSize];
+    Rtc.GetMemory(buffer, DS1302RamSize);
+
+    uint8_t pos = 0;
+
+    memcpy(EEPROM_UIDs, &buffer[pos], MAX_UID_CHECK_SIZE);
+    pos += MAX_UID_CHECK_SIZE;
+
+    memcpy(&LastMoney, &buffer[pos], sizeof(LastMoney));
+    pos += sizeof(LastMoney);
+    memcpy(&LastLiter, &buffer[pos], sizeof(LastLiter));
+    pos += sizeof(LastLiter);
+
+    memcpy(&XMode, &buffer[pos], sizeof(XMode));
+    pos += sizeof(XMode);
+    memcpy(&AddPulsePercent, &buffer[pos], sizeof(AddPulsePercent));
+    pos += sizeof(AddPulsePercent);
+
+    memcpy(&Meter24VFactor, &buffer[pos], sizeof(Meter24VFactor));
+    pos += sizeof(Meter24VFactor);
+}
