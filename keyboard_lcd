@@ -1,0 +1,879 @@
+#pragma once
+#include <./global.h>
+#include <./MainLCD.h>
+#include <./ExtCtrl.h>
+
+// Keyboard LCD 8
+#    define KB8_VDAT_PORT PORTA
+#    define KB8_VRST_PORT PORTC
+#    define KB8_VCLK_PORT PORTC
+#    define KB8_VDAT PA3 // DATA of VFD on the keypad board
+#    define KB8_VRST PC3 // RESET of VFD
+#    define KB8_VCLK PC4 // CLK of VFD on Keypad board
+// Keyboard LCD 9
+#    define KB9_VRST_PORT PORTA
+#    define KB9_VCLK_PORT PORTC
+#    define KB9_VDAT_PORT PORTC
+#    define KB9_VRST PA3 // RESET of VFD
+#    define KB9_VCLK PC3 // CLK of VFD on Keypad board
+#    define KB9_VDAT PC4 // DATA of VFD on the keypad board
+
+#define COMMAND1 0x06 // Display Mode Setting : 10 digits, 12 segments
+#define COMMAND2 0x40 // Data Setting : Write data to display mode
+#define COMMAND3 0xC0 // Address Setting : starting address at 0x00
+#define COMMAND4 0x8F // Display Control : Display On, Pulse Width = 4/16: 0x8D
+#define COMMAND5 0x08 // Display Mode Setting : 12 digits, 16 segments
+
+#define LCD8_DP 0x80
+#define KB89_DP 0x01
+
+// Keyboard
+#    define KB_DATA_PORT PORTB
+#    define KB_KCLK_PORT PORTA
+#    define KB_LATH_PORT PORTA
+#    define KB_DATA_PIN PINB
+#    define KB_KCLK_PIN PINA
+#    define KB_LATH_PIN PINA
+#    define KB_DATA PB3 // serial Data of matrix key
+#    define KB_KCLK PA4 // CLK for shifting data of 74HC595 and 74HC165
+#    define KB_LATH PA2 // Latching data of 74HC595 and 74HC165
+
+// BCD Code for SEEN 8,9 Keyboard
+uint8_t Keyboard_8_LCDCodeTable[11] = {0xFC, 0x44, 0xF2, 0xD6, 0x4E, 0x9E, 0xBE, 0xC4, 0xFE, 0xDE, 0x00};
+uint8_t Keyboard_9_LCDCodeTable[11] = {0xFC, 0x60, 0xDA, 0xF2, 0x66, 0xB6, 0xBE, 0xE0, 0xFE, 0xF6, 0x00};
+
+// Keyboards
+#define KB89_KEYCOUNTS 0x19
+#define KB89_KEY_EXIT 0x00
+
+// 8
+#define KB8_KEY_MONEY 0x35
+#define KB8_KEY_LITER 0x25
+#define KB8_KEY_F1 0x11
+#define KB8_KEY_F2 0x12
+#define KB8_KEY_F3 0x13
+#define KB8_KEY_F4 0x14
+#define KB8_KEY_F5 0x15
+#define KB8_KEY_NUM_1 0x21
+#define KB8_KEY_NUM_2 0x22
+#define KB8_KEY_NUM_3 0x23
+#define KB8_KEY_NUM_4 0x24
+#define KB8_KEY_NUM_5 0x31
+#define KB8_KEY_NUM_6 0x32
+#define KB8_KEY_NUM_7 0x33
+#define KB8_KEY_NUM_8 0x34
+#define KB8_KEY_NUM_9 0x41
+#define KB8_KEY_NUM_0 0x42
+#define KB8_KEY_NUM_00 0x43
+#define KB8_KEY_NUM_000 0x44
+#define KB8_KEY_P 0x45
+#define KB8_KEY_C 0x51
+#define KB8_KEY_S 0x52
+#define KB8_KEY_E 0x53
+#define KB8_KEY_TIME 0x54
+#define KB8_KEY_TOTAL 0x55
+
+// 9
+#define KB9_KEY_MONEY 0x06
+#define KB9_KEY_LITER 0x01
+#define KB9_KEY_F1 0x07
+#define KB9_KEY_F2 0x19
+#define KB9_KEY_F3 0x02
+#define KB9_KEY_F4 0x05
+#define KB9_KEY_F5 0x0F
+#define KB9_KEY_NUM_1 0x14
+#define KB9_KEY_NUM_2 0x15
+#define KB9_KEY_NUM_3 0x13
+#define KB9_KEY_NUM_4 0x12
+#define KB9_KEY_NUM_5 0x17
+#define KB9_KEY_NUM_6 0x16
+#define KB9_KEY_NUM_7 0x10
+#define KB9_KEY_NUM_8 0x11
+#define KB9_KEY_NUM_9 0x08
+#define KB9_KEY_NUM_0 0x09
+#define KB9_KEY_NUM_00 0x0B
+#define KB9_KEY_NUM_000 0x0C
+#define KB9_KEY_P 0x03
+#define KB9_KEY_C 0x0D
+#define KB9_KEY_S 0x18
+#define KB9_KEY_E 0x0A
+#define KB9_KEY_TIME 0x0E  // #
+#define KB9_KEY_TOTAL 0x04 //*
+
+////////////////////////////////////////////////////////////////////////
+uint8_t CurrentSecond;
+uint8_t bDs1302OutOfBattery = 0, EnableTime, HienThiGio;
+uint8_t BufferKey[25], RptKey[25];
+////////////////////////////////////////////////////////////////////////
+uint8_t PreKeyCode;
+uint8_t KeyCode;
+uint16_t KeyDelay;
+
+bool EnableKeyTestFlag = 1, PressedKeyFlag, PressedFirstKeyFlag;
+
+int8_t GetKeyboardNumb(int8_t Index)
+{
+    if (Keyboard_Version == 8)
+    {
+        return Keyboard_8_LCDCodeTable[Index];
+    }
+    else
+    {
+        return Keyboard_9_LCDCodeTable[Index];
+    }
+}
+
+uint8_t NumericKeyFilter(uint8_t uKeyInput)
+{
+    switch (uKeyInput)
+    {
+        case KB9_KEY_NUM_0:
+            return 0;
+        case KB9_KEY_NUM_1:
+            return 1;
+        case KB9_KEY_NUM_2:
+            return 2;
+        case KB9_KEY_NUM_3:
+            return 3;
+        case KB9_KEY_NUM_4:
+            return 4;
+        case KB9_KEY_NUM_5:
+            return 5;
+        case KB9_KEY_NUM_6:
+            return 6;
+        case KB9_KEY_NUM_7:
+            return 7;
+        case KB9_KEY_NUM_8:
+            return 8;
+        case KB9_KEY_NUM_9:
+            return 9;
+    }
+    return 0x00;
+}
+
+void setup_Keyboard_Lcd()
+{
+    if (Keyboard_Version == 9)
+    {
+        KB9_VRST_PORT |= _BV(KB9_VRST);
+    }
+    else
+    {
+        KB8_ClearSTB();
+        SetKeyboard_8_LCDData(COMMAND2);
+        KB8_PulseSTB();
+        SetKeyboard_8_LCDData(COMMAND3);
+        for (uint8_t i = 0; i < 20; i++)
+        {
+            SetKeyboard_8_LCDData(0x00);
+        }
+        KB8_PulseSTB();
+        SetKeyboard_8_LCDData(COMMAND1);
+        KB8_PulseSTB();
+        SetKeyboard_8_LCDData(COMMAND4);
+        KB8_SetSTB();
+    }
+}
+
+int8_t ConvertKey8_9(int8_t keycode_8)
+{
+    switch (keycode_8)
+    {
+        case KB8_KEY_MONEY:
+            return KB9_KEY_MONEY;
+        case KB8_KEY_LITER:
+            return KB9_KEY_LITER;
+        case KB8_KEY_F1:
+            return KB9_KEY_F1;
+        case KB8_KEY_F2:
+            return KB9_KEY_F2;
+        case KB8_KEY_F3:
+            return KB9_KEY_F3;
+        case KB8_KEY_F4:
+            return KB9_KEY_F4;
+        case KB8_KEY_F5:
+            return KB9_KEY_F5;
+        case KB8_KEY_NUM_1:
+            return KB9_KEY_NUM_1;
+        case KB8_KEY_NUM_2:
+            return KB9_KEY_NUM_2;
+        case KB8_KEY_NUM_3:
+            return KB9_KEY_NUM_3;
+        case KB8_KEY_NUM_4:
+            return KB9_KEY_NUM_4;
+        case KB8_KEY_NUM_5:
+            return KB9_KEY_NUM_5;
+        case KB8_KEY_NUM_6:
+            return KB9_KEY_NUM_6;
+        case KB8_KEY_NUM_7:
+            return KB9_KEY_NUM_7;
+        case KB8_KEY_NUM_8:
+            return KB9_KEY_NUM_8;
+        case KB8_KEY_NUM_9:
+            return KB9_KEY_NUM_9;
+        case KB8_KEY_NUM_0:
+            return KB9_KEY_NUM_0;
+        case KB8_KEY_NUM_00:
+            return KB9_KEY_NUM_00;
+        case KB8_KEY_NUM_000:
+            return KB9_KEY_NUM_000;
+        case KB8_KEY_P:
+            return KB9_KEY_P;
+        case KB8_KEY_C:
+            return KB9_KEY_C;
+        case KB8_KEY_S:
+            return KB9_KEY_S;
+        case KB8_KEY_E:
+            return KB9_KEY_E;
+        case KB8_KEY_TIME:
+            return KB9_KEY_TIME;
+        case KB8_KEY_TOTAL:
+            return KB9_KEY_TOTAL;
+    }
+    return 0x00;
+}
+
+bool ScanKeypad()
+{
+    if (Keyboard_Version == 8)
+        return ScanKeypad_8();
+    else
+        return ScanKeypad_9();
+}
+
+bool ScanKeypad_8()
+{
+    uint8_t LineCode, i, j, Mask, LineMask, LineSelect;
+    LineCode = 0x10;
+    Mask = 0x80;
+    LineMask = 0x01;
+    LineCode = 0x10;
+
+    if (EnableKeyTestFlag)
+    {
+        for (j = 0; j < 5; j++)
+        {
+            LineSelect = LineMask;
+            KB_LATH_PORT &= ~_BV(KB_LATH);
+            delay_us(50);
+            i = 8;
+            while (i != 0)
+            {
+                if ((Mask) & (~LineSelect))
+                    KB8_VDAT_PORT |= _BV(KB8_VDAT);
+                else
+                    KB8_VDAT_PORT &= ~_BV(KB8_VDAT);
+                delay_us(50);
+                KB_KCLK_PORT |= _BV(KB_KCLK);
+                delay_us(50);
+                KB_KCLK_PORT &= ~_BV(KB_KCLK);
+                i--;
+                LineSelect = LineSelect << 1;
+            }
+            delay_us(50);
+            KB_LATH_PORT |= _BV(KB_LATH);
+            delay_us(50);
+            KB_LATH_PORT &= ~_BV(KB_LATH);
+            delay_us(50);
+            KB_LATH_PORT |= _BV(KB_LATH);
+            delay_us(50);
+
+            i = 8;
+            while (i != 0)
+            {
+                if (PressedKeyFlag == 0)
+                {
+                    if (KB_DATA_PIN & _BV(KB_DATA))
+                    {
+                        if (PressedFirstKeyFlag == 0)
+                        {
+                            EnableKeyTestFlag = 0;
+                            PressedFirstKeyFlag = 1;
+                            PreKeyCode = LineCode + i;
+                            return false;
+                        }
+                        else
+                        {
+                            KeyCode = LineCode + i;
+                            if (PreKeyCode == KeyCode)
+                            {
+                                PressedKeyFlag = 1;
+                                PressedFirstKeyFlag = 0;
+                                return false;
+                            }
+                            else
+                            {
+                                PressedFirstKeyFlag = 0;
+                                return false;
+                            }
+                        }
+                    }
+                }
+                else if (!(KB_DATA_PIN & _BV(KB_DATA)))
+                {
+                    KeyCode = LineCode + i;
+                    if (PreKeyCode == KeyCode)
+                    {
+                        KeyCode = ConvertKey8_9(PreKeyCode);
+                        PreKeyCode = 0;
+                        PressedKeyFlag = 0;
+                        return true;
+                    }
+                }
+
+                KB_KCLK_PORT |= _BV(KB_KCLK);
+                delay_us(50);
+                KB_KCLK_PORT &= ~_BV(KB_KCLK);
+                delay_us(50);
+                i--;
+            }
+
+            LineCode = LineCode + 16;
+            LineMask = LineMask << 1;
+        }
+
+        return false;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+void ReadKeyboard_9()
+{
+    KB_LATH_PORT &= ~_BV(KB_LATH);
+    KB_LATH_PORT |= _BV(KB_LATH);
+    for (uint8_t i = 0; i < KB89_KEYCOUNTS; i++)
+    {
+        KB_KCLK_PORT &= ~_BV(KB_KCLK);
+        KB_KCLK_PORT |= _BV(KB_KCLK);
+        if (KB_DATA_PIN & _BV(KB_DATA))
+            BufferKey[i] = 1;
+        else
+            BufferKey[i] = 0;
+    }
+}
+
+bool ScanKeypad_9()
+{
+    uint8_t i, j;
+    ReadKeyboard_9();
+    for (i = 0; i < KB89_KEYCOUNTS; i++)
+    {
+        if (BufferKey[i] == 1)
+            break;
+        else
+            RptKey[i] = 0;
+    }
+
+    if (i < KB89_KEYCOUNTS)
+    {
+        for (j = 0; j < 50; j++)
+        {
+            ReadKeyboard_9();
+            if (BufferKey[i] == 0)
+                break;
+            delay_ms(1);
+        }
+        if (j >= 50)
+        {
+            if (RptKey[i] == 0)
+            {
+                KeyCode = i;
+                if (KeyCode == 0)
+                    KeyCode = KB89_KEYCOUNTS;
+                RptKey[i] = 1;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void KB8_ClearSTB()
+{
+    KB8_VRST_PORT &= ~_BV(KB8_VRST);
+    delay_us(20);
+}
+void KB8_SetSTB()
+{
+    KB8_VRST_PORT |= _BV(KB8_VRST);
+    delay_us(20);
+}
+void KB8_PulseSTB()
+{
+    KB8_VRST_PORT |= _BV(KB8_VRST);
+    delay_us(10);
+    KB8_VRST_PORT &= ~_BV(KB8_VRST);
+    delay_us(10);
+}
+
+void SetKeyboard_8_LCDData(uint8_t Data)
+{
+    uint8_t i, iMask;
+    for (i = 0, iMask = 0x01; i < 8; i++, Data = Data >> 1)
+    {
+        KB8_VCLK_PORT &= ~_BV(KB8_VCLK);
+        delay_us(KEYBOARD_LCD_SIGNAL_DELAY);
+        if ((iMask & Data))
+            KB8_VDAT_PORT |= _BV(KB8_VDAT);
+        else
+            KB8_VDAT_PORT &= ~_BV(KB8_VDAT);
+        delay_us(KEYBOARD_LCD_SIGNAL_DELAY);
+        KB8_VCLK_PORT |= _BV(KB8_VCLK);
+        delay_us(KEYBOARD_LCD_SIGNAL_DELAY);
+    }
+    delay_us(KEYBOARD_LCD_SIGNAL_DELAY);
+}
+void SetKeyboard_9_LCDData(uint8_t Data)
+{
+    uint8_t i, iMask;
+    for (i = 0, iMask = 0x01; i < 8; i++, iMask = iMask << 1)
+    {
+        KB9_VCLK_PORT |= _BV(KB9_VCLK);
+        delay_us(KEYBOARD_LCD_SIGNAL_DELAY);
+        if (Data & iMask)
+            KB9_VDAT_PORT |= _BV(KB9_VDAT);
+        else
+            KB9_VDAT_PORT &= ~_BV(KB9_VDAT);
+        delay_us(KEYBOARD_LCD_SIGNAL_DELAY);
+        KB9_VCLK_PORT &= ~_BV(KB9_VCLK);
+        delay_us(KEYBOARD_LCD_SIGNAL_DELAY);
+    }
+}
+
+void ShowKeyboardLcdNoC()
+{
+    switch (Keyboard_Version)
+    {
+        case 8:
+            ShowKeyboard_8_LCD(false);
+            break;
+
+        case 9:
+            ShowKeyboard_9_LCD(false);
+            break;
+    }
+}
+
+void ShowKeyboardLCD(bool dotThousand)
+{
+    switch (Keyboard_Version)
+    {
+        case 8:
+            ShowKeyboard_8_LCD(dotThousand);
+            break;
+
+        case 9:
+            ShowKeyboard_9_LCD(dotThousand);
+            break;
+    }
+}
+
+void ShowKeyboard_8_LCD(bool dotThousand)
+{
+    KeyboardDisplay[4] |= dotThousand ? KB89_DP : 0x00;
+
+    KB8_ClearSTB();
+    SetKeyboard_8_LCDData(COMMAND1);
+    KB8_PulseSTB();
+    SetKeyboard_8_LCDData(COMMAND2);
+    KB8_PulseSTB();
+    SetKeyboard_8_LCDData(COMMAND3);
+
+    for (int8_t i = 0; i < 10; i++)
+    {
+        SetKeyboard_8_LCDData(KeyboardDisplay[i]);
+        SetKeyboard_8_LCDData(0);
+        SetKeyboard_8_LCDData(0);
+    }
+
+    KB8_PulseSTB();
+    SetKeyboard_8_LCDData(COMMAND4);
+
+    KB8_SetSTB();
+    delay_us(20);
+}
+
+void ShowKeyboard_9_LCD(bool dotThousand)
+{
+    KeyboardDisplay[4] |= dotThousand ? KB89_DP : 0x00;
+    for (uint8_t i = 0; i < 8; i++)
+    {
+        SetKeyboard_9_LCDData(KeyboardDisplay[i]);
+    }
+}
+
+void ShowVersion()
+{
+    switch (LCD_Version)
+    {
+        case 8:
+        {
+            KeyboardDisplay[0] = GetKeyboardChar('S');
+            KeyboardDisplay[1] = GetKeyboardChar('E');
+            KeyboardDisplay[2] = GetKeyboardChar('d');
+            KeyboardDisplay[3] = GetKeyboardChar('I');
+            KeyboardDisplay[4] = GetKeyboardNumb(8);
+            KeyboardDisplay[6] = 0x00;
+            KeyboardDisplay[7] = 0x00;
+        }
+        break;
+        case 9:
+        {
+            KeyboardDisplay[0] = GetKeyboardChar('S');
+            KeyboardDisplay[1] = GetKeyboardChar('E');
+            KeyboardDisplay[2] = GetKeyboardChar('E');
+            KeyboardDisplay[3] = GetKeyboardChar('N');
+            KeyboardDisplay[4] = 0x00;
+            KeyboardDisplay[6] = 0x00;
+            KeyboardDisplay[7] = GetKeyboardNumb(9);
+        }
+        break;
+        case 12:
+        {
+            KeyboardDisplay[0] = GetKeyboardChar('S');
+            KeyboardDisplay[1] = GetKeyboardChar('E');
+            KeyboardDisplay[2] = GetKeyboardChar('E');
+            KeyboardDisplay[3] = GetKeyboardChar('N');
+            KeyboardDisplay[4] = 0x00;
+            KeyboardDisplay[6] = GetKeyboardNumb(1);
+            KeyboardDisplay[7] = GetKeyboardNumb(2);
+        }
+        break;
+        case 11:
+        {
+            KeyboardDisplay[0] = GetKeyboardChar('S');
+            KeyboardDisplay[1] = GetKeyboardChar('E');
+            KeyboardDisplay[2] = GetKeyboardChar('E');
+            KeyboardDisplay[3] = GetKeyboardChar('N');
+            KeyboardDisplay[4] = 0x00;
+            KeyboardDisplay[6] = GetKeyboardNumb(1);
+            KeyboardDisplay[7] = GetKeyboardNumb(1);
+        }
+        break;
+    }
+    KeyboardDisplay[5] = 0x00;
+    KeyboardDisplay[8] = 0x00;
+    KeyboardDisplay[9] = 0x00;
+    ShowKeyboardLCD(false);
+}
+
+void setupKeyboard()
+{
+    if ((LoaiBanPhim == 9 && KB_SWITCH_STT) || (LoaiBanPhim == 8 && !KB_SWITCH_STT))
+    {
+        Keyboard_Version = 9;
+        KB9_VRST_PORT |= _BV(KB9_VRST);
+        KB9_VCLK_PORT |= _BV(KB9_VCLK);
+    }
+    else
+    {
+        Keyboard_Version = 8;
+        KB8_VRST_PORT |= _BV(KB8_VRST);
+        KB8_VCLK_PORT |= _BV(KB8_VCLK);
+    }
+
+    KB_KCLK_PORT &= ~_BV(KB_KCLK);
+    KB_DATA_PORT &= ~_BV(KB_DATA);
+    KB_LATH_PORT &= ~_BV(KB_LATH);
+    KB_LATH_PORT |= _BV(KB_LATH);
+
+    for (uint8_t i = 0; i < KB89_KEYCOUNTS; i++)
+    {
+        BufferKey[i] = 0;
+    }
+
+    setup_Keyboard_Lcd();
+    FixLineDispVFD(ecVFD_LINE::LINEVFD_KEYBOARD_TYPE);
+}
+
+int8_t GetKeyboardChar(int8_t ascii)
+{
+    switch (ascii)
+    {
+        case 0:
+            return 0x00;
+
+        case 'A':
+            return 0xEE;
+
+        case 'b':
+            return 0x3E;
+
+        case 'c':
+            return Keyboard_Version == 8 ? 0x32 : 0x9C;
+
+        case 'C':
+            return Keyboard_Version == 8 ? 0xB8 : 0x9C;
+
+        case 'd':
+            return Keyboard_Version == 8 ? 0x76 : 0x7A;
+
+        case 'E':
+            return Keyboard_Version == 8 ? 0xBA : 0x9E;
+
+        case 'F':
+            return Keyboard_Version == 8 ? 0xAA : 0x8E;
+
+        case 'G':
+            return 0xBE;
+
+        case 'h':
+            return 0x2E;
+
+        case 'H':
+            return 0x6E;
+
+        case 'i':
+            return Keyboard_Version == 8 ? 0x20 : 0x08;
+
+        case 'I':
+            return Keyboard_Version == 8 ? 0x44 : 0x60;
+
+        case 'L':
+            return Keyboard_Version == 8 ? 0x38 : 0x1C;
+
+        case 'n':
+            return Keyboard_Version == 8 ? 0x26 : 0x2A;
+
+        case 'N':
+            return Keyboard_Version == 8 ? 0xEC : 0xEC;
+
+        case 'o':
+            return Keyboard_Version == 8 ? 0x36 : 0x3A;
+
+        case 'P':
+            return Keyboard_Version == 8 ? 0xEA : 0xCE;
+
+        case 'S':
+            return Keyboard_Version == 8 ? 0x9E : 0xB6;
+
+        case 't':
+            return Keyboard_Version == 8 ? 0x3A : 0x1E;
+
+        case 'r':
+            return Keyboard_Version == 8 ? 0x22 : 0x0A;
+
+        case 'U':
+            return Keyboard_Version == 8 ? 0x7C : 0x7C;
+
+        case 'u':
+            return Keyboard_Version == 8 ? 0x34 : 0x38;
+    }
+    return 0x00;
+}
+
+void FixLineDispVFD(ecVFD_LINE vfdLineCode)
+{
+    currentVfdLineCode = vfdLineCode;
+
+    uint8_t i;
+    for (i = 1; i < 10; i++)
+    {
+        KeyboardDisplay[i] = 0x00;
+    }
+
+    switch (vfdLineCode)
+    {
+        case ecVFD_LINE::LINEVFD_ERROR_1_PULSE_METTER_CABLE:
+        {
+            KeyboardDisplay[0] = GetKeyboardChar('L');
+            KeyboardDisplay[1] = GetKeyboardChar('o');
+            KeyboardDisplay[2] = GetKeyboardChar('i');
+            KeyboardDisplay[3] = GetKeyboardChar('d');
+            KeyboardDisplay[4] = GetKeyboardChar('A');
+            KeyboardDisplay[5] = GetKeyboardChar('u');
+            KeyboardDisplay[6] = GetKeyboardChar('d');
+            KeyboardDisplay[7] = GetKeyboardChar('o');
+            ShowKeyboardLCD(false);
+
+            ErrorSystem = ES3_DRIFTED;
+        }
+        break;
+        case ecVFD_LINE::PRESET_MONEY:
+        {
+            KeyboardDisplay[0] = GetKeyboardChar('t');
+            // KeyboardDisplay[1] = 0x00;
+            // KeyboardDisplay[2] = 0x00;
+            // KeyboardDisplay[3] = 0x00;
+            // KeyboardDisplay[4] = 0x00;
+            // KeyboardDisplay[5] = 0x00;
+            // KeyboardDisplay[6] = 0x00;
+            KeyboardDisplay[7] = GetKeyboardNumb(0);
+            ShowKeyboardLCD(false);
+
+            ClearLine(MONEY_LINE);
+            ClearLine(LITER_LINE);
+            ShowMainLCD();
+
+            PresetLiter = 0;
+            PresetMoney = 0;
+        }
+        break;
+        case ecVFD_LINE::PRESET_LITER:
+        {
+            KeyboardDisplay[0] = GetKeyboardChar('L');
+            // KeyboardDisplay[1] = 0x00;
+            // KeyboardDisplay[2] = 0x00;
+            // KeyboardDisplay[3] = 0x00;
+            KeyboardDisplay[4] = GetKeyboardNumb(0) | KB89_DP;
+            KeyboardDisplay[5] = GetKeyboardNumb(0);
+            KeyboardDisplay[6] = GetKeyboardNumb(0);
+            KeyboardDisplay[7] = GetKeyboardNumb(0);
+            ShowKeyboardLCD(false);
+
+            ClearLine(MONEY_LINE);
+            ClearLine(LITER_LINE);
+            ShowMainLCD();
+
+            PresetMoney = 0;
+            PresetLiter = 0;
+        }
+        break;
+        case ecVFD_LINE::LINEVFD_PASWORD:
+        {
+            HEX_BCDFunc(0, MONEY_LINE);
+            HEX_BCDFunc(0, LITER_LINE);
+
+            KeyboardDisplay[0] = GetKeyboardChar('P');
+            // KeyboardDisplay[1] = 0x00;
+            // KeyboardDisplay[2] = 0x00;
+            // KeyboardDisplay[3] = 0x00;
+            // KeyboardDisplay[4] = 0x00;
+            // KeyboardDisplay[5] = 0x00;
+            // KeyboardDisplay[6] = 0x00;
+            // KeyboardDisplay[7] = 0x00;
+            ShowKeyboardLCD(false);
+        }
+        break;
+        case ecVFD_LINE::PRICE_SETTING:
+        {
+            KeyboardDisplay[0] = GetKeyboardChar('G');
+            KeyboardDisplay[1] = GetKeyboardChar('I');
+            KeyboardDisplay[2] = GetKeyboardChar('A');
+            // KeyboardDisplay[3] = 0x00;
+            // KeyboardDisplay[4] = 0x00;
+            // KeyboardDisplay[5] = 0x00;
+            // KeyboardDisplay[6] = 0x00;
+            // KeyboardDisplay[7] = 0x00;
+
+            ClearLine(MONEY_LINE);
+            ClearLine(LITER_LINE);
+            ClearLine(PRICE_LINE);
+
+            GeneralBuf = 0;
+            ShowMainLCD();
+            ShowKeyboardLCD(false);
+        }
+        break;
+        case ecVFD_LINE::MUL_FUNCTION:
+        {
+            KeyboardDisplay[0] = GetKeyboardChar('F');
+            KeyboardDisplay[1] = GetKeyboardNumb(1);
+            KeyboardDisplay[2] = GetKeyboardChar('F');
+            KeyboardDisplay[3] = GetKeyboardNumb(2);
+            KeyboardDisplay[4] = GetKeyboardChar('F');
+            KeyboardDisplay[5] = GetKeyboardNumb(3);
+            KeyboardDisplay[6] = GetKeyboardNumb(4);
+            KeyboardDisplay[7] = GetKeyboardNumb(5);
+            ShowKeyboardLCD(false);
+        }
+        break;
+        case ecVFD_LINE::ANTI_DRIFT:
+        {
+            KeyboardDisplay[0] = GetKeyboardChar('C');
+            KeyboardDisplay[1] = GetKeyboardChar('h');
+            KeyboardDisplay[2] = GetKeyboardChar('E');
+            // KeyboardDisplay[3] = 0x00;
+            KeyboardDisplay[4] = GetKeyboardNumb(AntiDrift4x / 10);
+            KeyboardDisplay[5] = GetKeyboardNumb(AntiDrift4x % 10);
+            // KeyboardDisplay[6] = 0x00;
+            // KeyboardDisplay[7] = 0x00;
+
+            ShowKeyboardLCD(false);
+        }
+        break;
+        case ecVFD_LINE::ROUND_PRE_MONEY:
+        {
+            KeyboardDisplay[0] = RoundPreMoney ? GetKeyboardChar('C') : GetKeyboardChar('n');
+            KeyboardDisplay[1] = GetKeyboardChar('o');
+            // KeyboardDisplay[2] = 0x00;
+            // KeyboardDisplay[3] = 0x00;
+            KeyboardDisplay[4] = GetKeyboardChar('t');
+            KeyboardDisplay[5] = GetKeyboardChar('r');
+            KeyboardDisplay[6] = GetKeyboardChar('o');
+            KeyboardDisplay[7] = GetKeyboardChar('n');
+            ShowKeyboardLCD(false);
+        }
+        break;
+        case ecVFD_LINE::ROUND_FREE_MONEY:
+        {
+            KeyboardDisplay[0] = RoundFreeMoney ? GetKeyboardChar('C') : GetKeyboardChar('n');
+            KeyboardDisplay[1] = GetKeyboardChar('o');
+            // KeyboardDisplay[2] = 0x00;
+            // KeyboardDisplay[3] = 0x00;
+            KeyboardDisplay[4] = GetKeyboardChar('t');
+            KeyboardDisplay[5] = GetKeyboardChar('r');
+            KeyboardDisplay[6] = GetKeyboardChar('o');
+            KeyboardDisplay[7] = GetKeyboardChar('n');
+            ShowKeyboardLCD(false);
+        }
+        break;
+        case ecVFD_LINE::OFFVALVE_LEVEL:
+        {
+            KeyboardDisplay[0] = GetKeyboardChar('U');
+            KeyboardDisplay[1] = GetKeyboardNumb(1);
+            // KeyboardDisplay[2] = 0x00;
+            // KeyboardDisplay[3] = 0x00;
+            // KeyboardDisplay[4] = 0x00;
+            // KeyboardDisplay[5] = 0x00;
+            KeyboardDisplay[6] = GetKeyboardNumb(OffValvePercent / 10);
+            KeyboardDisplay[7] = GetKeyboardNumb(OffValvePercent % 10);
+            ShowKeyboardLCD(false);
+        }
+        break;
+    }
+}
+
+void ShowPwdOnKeyboardLCD(uint32_t uPwd, uint8_t *ptrPassword)
+{
+    uint32_t temp = uPwd;
+    int8_t i = 0;
+    KeyboardDisplay[0] = GetKeyboardChar('P');
+
+    // clear
+    for (i = 1; i < 10; i++)
+    {
+        KeyboardDisplay[i] = 0x00;
+    }
+
+    // split number and display
+    i = 0;
+    do
+    {
+        KeyboardDisplay[7 - i] = GetKeyboardNumb(uPwd % 10);
+        uPwd /= 10;
+        i++;
+    } while (i <= IndexNewPassword);
+    ShowKeyboardLCD(false);
+
+    IndexNewPassword++;
+    if (IndexNewPassword == 6)
+    {
+        i = 0;
+        do
+        {
+            ptrPassword[5 - i] = temp % 10;
+            temp /= 10;
+            i++;
+        } while (i <= 5);
+    }
+}
+void Cancel()
+{
+    EnablePressedKey = 0;
+    CountDelayKey = 0;
+    bDisplayingCardInfo = 0;
+} 
